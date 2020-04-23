@@ -3,6 +3,7 @@ datos <- datos[rev(rownames(datos)),]
 NGSP <- ts(datos[,2], start=1997, freq=12)
 
 
-# FAC
+# FAC y FACP
 FAC <- acf(NGSP)
+FACP <- pacf(NGSP)
 
