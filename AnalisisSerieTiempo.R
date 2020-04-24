@@ -78,8 +78,8 @@ checkresiduals(autoarima)
 # Supuesto 4 (normalidad)
 # Verificar que aprox. el 95% de las observaciones se encuentren dentro del intervalo que se extiende 2 
 # desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
--2*desv
-2*desv
+LI2 <- -2*desv
+LS2 <- 2*desv
 
 qqnorm(res_autoarima)
 qqline(res_autoarima)
@@ -87,15 +87,33 @@ checkresiduals(autoarima)
 shapiro.test(res_autoarima)
 lillie.test(x = res_autoarima)
 
-
 # Supuesto 5 (no observaciones aberrantes)
+# Prácticamente todas las observaciones deberían estar dentro del intervalo que se extiende 3 desviaciones
+# estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+LI3 <- -3*desv
+LS3 <- 3*desv
 
 
-# Supuesto 6
+plot(res_autoarima, ylim=c(-2*10^(-3),6*10^(-4)))
+plot(res_autoarima)
+abline(h=LS2, col="red")
+abline(h=LI2, col="red")
+abline(h=LI3, col="blue")
+abline(h=LS3, col="blue")
 
-# Supuesto 7
 
-# Supuesto 8
+# Supuesto 6 (parsimonía)
+# Ver con un 95% de confianza que todos los parámetros sean diferentes de 0.
+# En este caso no hay parámetros ya que el modelo es I(1).
+
+
+# Supuesto 7 (modelo admisible)
+# Verificar que los parámetros se encuentren dentro de las regiones admisibles correspondientes.
+# En este caso no hay parámetros ya que el modelo es I(1).
+
+# Supuesto 8 (modelo estable)
+# Calculamos las correlaciones entre pares para ver que sean bajas.
+# En este caso no hay correlaciones ya que no hay parámetros, debido a que el modelo es I(1).
 
 
 ####################### Pronósticos #######################
