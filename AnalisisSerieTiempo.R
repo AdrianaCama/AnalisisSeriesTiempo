@@ -4,7 +4,9 @@ NGSP <- ts(datos[,2], start=1997, freq=12)
 
 
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
-auto.arima(NGSP)
+autoarima <- auto.arima(NGSP)
+autoarima_pronostico <-forecast(autoarima, h = 3) # Duda con h = 3
+autoplot(autoarima_pronostico)
 
 # FAC, FACP y varianza
 FAC <- acf(NGSP)
