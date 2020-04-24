@@ -36,3 +36,29 @@ ggAcf(BoxCoxNGSP, lag.max=100)
 ggtsdisplay(BoxCoxNGSP, lag.max=100)
 
 adf.test(BoxCoxNGSP) #Prueba de Dickey Fuller que no rechaza estacionariedad por lo que no habría que diferenciar
+
+
+
+
+
+
+
+####### Verificación de supuestos para cada modelo ########
+# Supuesto 1
+
+# Supuesto 2
+
+# Supuesto 3
+
+# Supuesto 4
+
+# Supuesto 5
+
+# Supuesto 6
+
+# Supuesto 7
+
+# Supuesto 8
+
+
+####################### Pronósticos #######################
