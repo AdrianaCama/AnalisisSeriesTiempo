@@ -6,9 +6,11 @@ NGSP <- ts(datos[,2], start=1997, freq=12)
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
 auto.arima(NGSP)
 
-# FAC y FACP
+# FAC, FACP y varianza
 FAC <- acf(NGSP)
 FACP <- pacf(NGSP)
+VarNGSP<-var(NGSP)
+VarNGSP
 
 # Dickey-Fuller Aumentado para probar estacionariedad. Sí lo es
 adf.test(NGSP)
