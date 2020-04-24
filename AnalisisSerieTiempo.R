@@ -43,16 +43,53 @@ adf.test(BoxCoxNGSP) #Prueba de Dickey Fuller que no rechaza estacionariedad por
 
 
 
-####### Verificación de supuestos para cada modelo ########
-# Supuesto 1
+################# Análisis de residuos ##################
+#Residuales
+res_autoarima <- residuals(autoarima)
+checkresiduals(autoarima)
 
-# Supuesto 2
 
-# Supuesto 3
+# Supuesto 1 (media cero)
+# Debemos verificar que el valor absoluto del cociente sea menor que dos para decir que no hay evidencia de que 
+# la media del proceso sea diferente de 0. 
+media <- mean(autoarima)
+media
+desv <- sqrt(var(res_autoarima))
+desv
 
-# Supuesto 4
+N <- length(res_autoarima)
+p <- 0
+d <- 1
+q <- 0
+cociente <- (sqrt(N-d-p)) * (media/desv)
+abs(cociente)
 
-# Supuesto 5
+
+# Supuesto 2 (varianza constante)
+# Observamos de manera visual si la varianza parece ser constante o no
+checkresiduals(autoarima)
+
+
+# Supuesto 3 (residuos independientes)
+# Prueba de Ljung-Box
+#Box.Ljung.Test(res_autoarima)
+
+
+# Supuesto 4 (normalidad)
+# Verificar que aprox. el 95% de las observaciones se encuentren dentro del intervalo que se extiende 2 
+# desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+-2*desv
+2*desv
+
+qqnorm(res_autoarima)
+qqline(res_autoarima)
+checkresiduals(autoarima)
+shapiro.test(res_autoarima)
+lillie.test(x = res_autoarima)
+
+
+# Supuesto 5 (no observaciones aberrantes)
+
 
 # Supuesto 6
 
