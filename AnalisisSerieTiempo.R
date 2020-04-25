@@ -1,6 +1,12 @@
 install.packages("forecast")
 library(forecast)
 library(tseries)
+library(fpp2)
+library(ggplot2)
+library(fma)
+library(expsmooth)
+library("nortest")
+
 
 datos <- read.csv("Henry_Hub_Natural_Gas_Spot_Price.csv", header = TRUE)
 datos <- datos[rev(rownames(datos)),]
@@ -25,15 +31,22 @@ ggseasonplot(NGSP)
 # Variación de la seasonal plot con coordenadas polares. Se puede observar que no es estacional.
 ggseasonplot(NGSP, polar = TRUE)
 
+# Es posible que el resultado que nos arroja nsdiffs señale que el proceso no es estacional
+nsdiffs(NGSP)
+
 # Esta función es para ver el número de veces que hay que diferenciar una serie para volverla estacionaria, como 
 # Como es una caminata aleatoria, sale 1, pues hemos demostrado anteriormente que la primera de la caminata aleatoria
 # es un proceso estacionario.
 ndiffs(NGSP)
 
+# Ahora, aplicamos la primera diferencia para convertirlo a un proceso estacionario
+NGSP_dif <- diff(NGSP, differences=1)
 
 
 
- #Estabilización de varianza con transformación de Box-Cox
+
+
+#Estabilización de varianza con transformación de Box-Cox
 lambda0<-BoxCox.lambda(NGSP)
 BoxCoxNGSP<-BoxCox(NGSP,lambda0)
 autoplot(BoxCoxNGSP)
@@ -56,11 +69,12 @@ adf.test(BoxCoxNGSP) #Prueba de Dickey Fuller que no rechaza estacionariedad por
 res_autoarima <- residuals(autoarima)
 checkresiduals(autoarima)
 
-
+#########################################################################################################
 # Supuesto 1 (media cero)
+#########################################################################################################
 # Debemos verificar que el valor absoluto del cociente sea menor que dos para decir que no hay evidencia de que 
 # la media del proceso sea diferente de 0. 
-media <- mean(autoarima)
+media <- mean(res_autoarima)
 media
 desv <- sqrt(var(res_autoarima))
 desv
@@ -71,9 +85,12 @@ d <- 1
 q <- 0
 cociente <- (sqrt(N-d-p)) * (media/desv)
 abs(cociente)
+# Como el valor absoluto del conciente es menor que 2, entonces podemos decir que no hay evidencia
+# suficiente para afirmar que la media del proceso es distinta de cero.
 
-
+#########################################################################################################
 # Supuesto 2 (varianza constante)
+#########################################################################################################
 # Observamos de manera visual si la varianza parece ser constante o no
 checkresiduals(autoarima)
 
