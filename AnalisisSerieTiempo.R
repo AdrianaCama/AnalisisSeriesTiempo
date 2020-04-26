@@ -1,4 +1,4 @@
-install.packages("forecast")
+#install.packages("forecast")
 library(forecast)
 library(tseries)
 library(fpp2)
@@ -7,23 +7,72 @@ library(fma)
 library(expsmooth)
 library("nortest")
 
+#package faraway
+library(faraway)
 
+################################################################################################
+################################################################################################
+################################################################################################
+### Identificación del modelo ##################################################################
+################################################################################################
+################################################################################################
+################################################################################################
+
+# Dataset and Setup
+# Primero, importamos la serie de tiempo
 datos <- read.csv("Henry_Hub_Natural_Gas_Spot_Price.csv", header = TRUE)
 datos <- datos[rev(rownames(datos)),]
 NGSP <- ts(datos[,2], start=1997, freq=12)
+# Con esto podemos ver la serie de tiempo
+#autoplot(NGSP) 
+
+# Segundo, quitamos outliers o missing values. CHECAR SI ESTÁ BIEN USAR ESTA FUNCIÓN xd
+NGSP <- tsclean(NGSP)
+#autoplot(NGSP) 
 
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
 autoarima <- auto.arima(NGSP)
 
-
+################################################################################################
 # FAC, FACP y varianza
 FAC <- acf(NGSP)
 FACP <- pacf(NGSP)
 VarNGSP<-var(NGSP)
 VarNGSP
+# Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1). Por otra
+# parte, la función auto.arima nos propone un modelo ARIMA(0,1,0). Analizaremos ambos.
 
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
+
+
+# Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación 
+# estabilizadora de varianza. Primero, veremos Box Cox:
+expected <- mean(NGSP)
+expected
+residuals <- residuals(naive(NGSP))
+autoplot(NGSP)
+autoplot(residuals)
+checkresiduals(NGSP)
+
+## Box Cox
+transformacion <- BoxCox.lambda(NGSP)
+BC <- BoxCox(NGSP, transformacion)
+residuals <- residuals(naive(BC))
+#autoplot(BC)
+autoplot(residuals)
+
+## Logaritmo
+transformacion_2 <- log(NGSP)
+residuals <- residuals(naive(transformacion_2))
+autoplot(residuals)
+
+
+
+# De acuerdo con esta página https://online.stat.psu.edu/stat462/node/148/, existen
+# varias pruebas para revisar si la varianza de los residuales es constante. Generalmente es 
+# suficiente verificarlo de manera visual pero existen pruebas que confirman nuestras sospechas
+
 
 # Graficamos por año con el objetivo de observar si hay estacionalidad
 ggseasonplot(NGSP)
@@ -93,6 +142,9 @@ abs(cociente)
 #########################################################################################################
 # Observamos de manera visual si la varianza parece ser constante o no
 checkresiduals(autoarima)
+# De forma visual, parece ser que la varianza no es constante desde 2002 hasta 2009, pues en esos años
+# se presentan algunos picos que pueden afectar la varianza de los residuales. Para confirmar, ap
+
 
 
 # Supuesto 3 (residuos independientes)
