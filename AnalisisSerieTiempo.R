@@ -42,6 +42,7 @@ VarNGSP
 # Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1). Por otra
 # parte, la función auto.arima nos propone un modelo ARIMA(0,1,0). Analizaremos ambos.
 
+
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
 
@@ -53,21 +54,47 @@ expected
 residuals <- residuals(naive(NGSP))
 autoplot(NGSP)
 autoplot(residuals)
-checkresiduals(NGSP)
 
 ## Box Cox
-transformacion <- BoxCox.lambda(NGSP)
-BC <- BoxCox(NGSP, transformacion)
-residuals <- residuals(naive(BC))
-#autoplot(BC)
-autoplot(residuals)
+lambda <- BoxCox.lambda(NGSP)
+NGSP_BC <- BoxCox(NGSP, lambda)
+# Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
+adf.test(NGSP_BC)
+# Creo que está peor jaja :(
 
+# Ahora probaremos la transformación logarítmica
 ## Logaritmo
-transformacion_2 <- log(NGSP)
-residuals <- residuals(naive(transformacion_2))
-autoplot(residuals)
+NGSP_LOG <- log(NGSP)
+adf.test(NGSP_LOG)
 
 
+# Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la 
+# serie normal, aplicando BoxCox y logaritmo
+# Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
+
+# Probaremos otras transformaciones
+## Square Root
+NGSP_SR <- sqrt(NGSP)
+adf.test(NGSP_SR)
+# Sin tsclean 0.2204, con tsclean 0,3155
+
+## Cube Root
+NGSP_CR <- (NGSP)^(1/3)
+adf.test(NGSP_CR)
+# Sin tsclean 0.2392, con tsclean 0.3261
+
+# Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la 
+# metodología que está en el Capítulo 4:
+H <- 5
+R <- 9
+r
+N <- length(NGSP)
+n <- 
+
+
+model <- Arima(NGSP_BC, order=c(1,0,0))
+residuals <- residuals(model)
+checkresiduals(model)
 
 # De acuerdo con esta página https://online.stat.psu.edu/stat462/node/148/, existen
 # varias pruebas para revisar si la varianza de los residuales es constante. Generalmente es 
