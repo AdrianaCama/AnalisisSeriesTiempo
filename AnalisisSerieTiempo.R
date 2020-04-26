@@ -86,10 +86,27 @@ adf.test(NGSP_CR)
 # Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la 
 # metodología que está en el Capítulo 4:
 H <- 5
-R <- 9
-r
 N <- length(NGSP)
-n <- 
+n <- 9
+R <- (N-n)/H
+
+breaks <- c()
+breaks[1] <- 0
+for(i in 1:H){
+  breaks[i+1] <- R*i
+}
+
+temp <- as.vector(t(NGSP))
+temp <- head(temp,length(temp)-n)
+
+matrix <- matrix(rep(0), nrow = H, ncol = 5) 
+S <- c()
+Z <- c()
+
+for(i in 1:H){
+  S[i] <- 
+  Z[i] <- 
+}
 
 
 model <- Arima(NGSP_BC, order=c(1,0,0))
