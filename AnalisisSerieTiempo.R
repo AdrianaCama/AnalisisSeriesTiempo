@@ -33,6 +33,7 @@ NGSP <- ts(datos[,2], start=1997, freq=12)
 autoplot(NGSP) 
 
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
+# Eso sale sin usar el comando tsclean(NGSP). Usándolo sale ARIMA(1,1,0)
 autoarima <- auto.arima(NGSP)
 
 ################################################################################################
@@ -47,6 +48,16 @@ VarNGSP
 
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
+
+# Graficamos por año con el objetivo de observar si hay estacionalidad
+ggseasonplot(NGSP)
+
+# Variación de la seasonal plot con coordenadas polares. Se puede observar que no es estacional.
+ggseasonplot(NGSP, polar = TRUE)
+
+# Es posible que el resultado que nos arroja nsdiffs señale que el proceso no es estacional
+nsdiffs(NGSP)
+
 
 # Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación
 # estabilizadora de varianza. Primero, veremos Box Cox:
@@ -97,8 +108,9 @@ H <- 5
 N <- length(NGSP)
 n <- 9
 R <- (N-n)/H
-lambdas <- c(-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5)
-
+#lambdas <- c(-20,-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5,7,10,20)
+lambdas <- c(-9,-8.5,-8,-7.5,-7,-6.5,-6,5.5)
+lambdas <- seq(from=-8.5,to=-7.5,by =0.05)
 
 breaks <- c()
 breaks[1] <- 0
@@ -139,6 +151,8 @@ for(i in 1:length(lambdas)){
 CC <- rbind(lambdas,CC)
 CC
 
+which.min(CC[2,])
+
 # Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
 # valores extremos
 NGSP_SQ <- NGSP^2
@@ -146,8 +160,8 @@ adf.test(NGSP_SQ)
 autoplot(NGSP_SQ)
 
 # Ahora, si quitamos los valores extremos y outliers de la serie original, la mejor
-# transformación es elevar la serie ~ a la -7
-NGSP_SR <- NGSP^(-7)
+# transformación es elevar la serie ~ a la -7 (-8.15)
+NGSP_SR <- NGSP^(-8.15)
 adf.test(NGSP_SR)
 autoplot(NGSP_SR)
 
@@ -158,67 +172,59 @@ autoplot(NGSP_SR)
 
 # Ahora utilizaremos el siguiente comando para ver cuántas
 # diferencias son necesarias para volver el proceso a uno estacionario.
-ndiffs(NGSP_SQ)
+ndiffs(NGSP_SR)
 
 # Aplicamos entonces una primera diferencia a la serie original
-DNGSP <- diff(NGSP_SQ)
+DNGSP <- diff(NGSP_SR)
 autoplot(DNGSP)
-# Podemos notar que la serie parece ser estacionaria con un punto de equilibrio en 0.
-mean(DNGSP)
 
+#### ESTO ES UNA PRUEBA
+# lambda <- BoxCox.lambda(DNGSP)
+# NGSP_BC <- BoxCox(DNGSP, lambda)
+# adf.test(NGSP_BC)
+# autoplot(NGSP_BC)
+# mean(DNGSP)
 
-model <- Arima(NGSP_BC, order=c(1,0,0))
+# Ahora veremos cómo se comportan la FAC y la FACP
+DFAC <- acf(DNGSP)
+DFACP <- pacf(DNGSP)
+
+ggtsdisplay(DNGSP, lag.max=200)
+#Aqui nos quedamos
+
+# Se asemejan a lo que habíamos visto antes. Sabemos que puede ser un ARIMA(0,1,0)
+# De hecho, con tsclean sale un ARIMA(1,1,0)
+# pero intentaremos con un AR(1)
+
+model <- Arima(DNGSP, order=c(0,2,1))
+model <- Arima(DNGSP, order=c(0,1,0))
+model <- Arima(DNGSP, order=c(1,1,0))
 residuals <- residuals(model)
 checkresiduals(model)
 
-# De acuerdo con esta página https://online.stat.psu.edu/stat462/node/148/, existen
-# varias pruebas para revisar si la varianza de los residuales es constante. Generalmente es 
-# suficiente verificarlo de manera visual pero existen pruebas que confirman nuestras sospechas
+# # Esta función es para ver el número de veces que hay que diferenciar una serie para volverla estacionaria, como 
+# # Como es una caminata aleatoria, sale 1, pues hemos demostrado anteriormente que la primera de la caminata aleatoria
+# # es un proceso estacionario.
+# ndiffs(NGSP)
+
+# # Ahora, aplicamos la primera diferencia para convertirlo a un proceso estacionario
+# NGSP_dif <- diff(NGSP, differences=1)
 
 
-# Graficamos por año con el objetivo de observar si hay estacionalidad
-ggseasonplot(NGSP)
-
-# Variación de la seasonal plot con coordenadas polares. Se puede observar que no es estacional.
-ggseasonplot(NGSP, polar = TRUE)
-
-# Es posible que el resultado que nos arroja nsdiffs señale que el proceso no es estacional
-nsdiffs(NGSP)
-
-# Esta función es para ver el número de veces que hay que diferenciar una serie para volverla estacionaria, como 
-# Como es una caminata aleatoria, sale 1, pues hemos demostrado anteriormente que la primera de la caminata aleatoria
-# es un proceso estacionario.
-ndiffs(NGSP)
-
-# Ahora, aplicamos la primera diferencia para convertirlo a un proceso estacionario
-NGSP_dif <- diff(NGSP, differences=1)
-
-
-
-
-
-#Estabilización de varianza con transformación de Box-Cox
-lambda0<-BoxCox.lambda(NGSP)
-BoxCoxNGSP<-BoxCox(NGSP,lambda0)
-autoplot(BoxCoxNGSP)
-
-
-#Gráfica de funciones de autocorrelaci?n y test para verificar estacionariedad
-ggAcf(BoxCoxNGSP, lag.max=100)
-ggtsdisplay(BoxCoxNGSP, lag.max=100)
-
-adf.test(BoxCoxNGSP) #Prueba de Dickey Fuller que no rechaza estacionariedad por lo que no habría que diferenciar
-
-
-
-
-
+# #Estabilización de varianza con transformación de Box-Cox
+# lambda0<-BoxCox.lambda(NGSP)
+# BoxCoxNGSP<-BoxCox(NGSP,lambda0)
+# autoplot(BoxCoxNGSP)
 
 
 ################# Análisis de residuos ##################
 #Residuales
 res_autoarima <- residuals(autoarima)
 checkresiduals(autoarima)
+
+### TEMPORAL
+res_autoarima <- residuals(model)
+
 
 #########################################################################################################
 # Supuesto 1 (media cero)
@@ -239,14 +245,15 @@ abs(cociente)
 # Como el valor absoluto del conciente es menor que 2, entonces podemos decir que no hay evidencia
 # suficiente para afirmar que la media del proceso es distinta de cero.
 
+
 #########################################################################################################
 # Supuesto 2 (varianza constante)
 #########################################################################################################
 # Observamos de manera visual si la varianza parece ser constante o no
 checkresiduals(autoarima)
-# De forma visual, parece ser que la varianza no es constante desde 2002 hasta 2009, pues en esos años
-# se presentan algunos picos que pueden afectar la varianza de los residuales. Para confirmar, ap
-
+# De forma visual, parece ser que la varianza no es constante pues
+# se presentan algunos picos que pueden afectar la varianza de los residuales. 
+# Para confirmar, aplicaremos una prueba:
 
 
 # Supuesto 3 (residuos independientes)
