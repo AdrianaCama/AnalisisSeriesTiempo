@@ -27,8 +27,10 @@ NGSP <- ts(datos[,2], start=1997, freq=12)
 #autoplot(NGSP) 
 
 # Segundo, quitamos outliers o missing values. CHECAR SI ESTÁ BIEN USAR ESTA FUNCIÓN xd
-NGSP <- tsclean(NGSP)
-#autoplot(NGSP) 
+# NGSP <- tsclean(NGSP)
+
+# Graficamos nuestra serie para obtener una vista previa
+autoplot(NGSP) 
 
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
 autoarima <- auto.arima(NGSP)
@@ -46,8 +48,7 @@ VarNGSP
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
 
-
-# Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación 
+# Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación
 # estabilizadora de varianza. Primero, veremos Box Cox:
 expected <- mean(NGSP)
 expected
@@ -66,29 +67,38 @@ adf.test(NGSP_BC)
 ## Logaritmo
 NGSP_LOG <- log(NGSP)
 adf.test(NGSP_LOG)
+autoplot(NGSP_LOG)
 
-
-# Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la 
-# serie normal, aplicando BoxCox y logaritmo
-# Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
-
+# # Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la
+# # serie normal, aplicando BoxCox y logaritmo
+# # Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
+#
 # Probaremos otras transformaciones
 ## Square Root
 NGSP_SR <- sqrt(NGSP)
 adf.test(NGSP_SR)
+autoplot(NGSP_SR)
 # Sin tsclean 0.2204, con tsclean 0,3155
-
+#
 ## Cube Root
 NGSP_CR <- (NGSP)^(1/3)
 adf.test(NGSP_CR)
+autoplot(NGSP_CR)
 # Sin tsclean 0.2392, con tsclean 0.3261
 
-# Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la 
+## One over
+NGSP_OO <- 1/NGSP
+adf.test(NGSP_OO)
+autoplot(NGSP_OO)
+
+# Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la
 # metodología que está en el Capítulo 4:
 H <- 5
 N <- length(NGSP)
 n <- 9
 R <- (N-n)/H
+lambdas <- c(-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5)
+
 
 breaks <- c()
 breaks[1] <- 0
@@ -99,14 +109,62 @@ for(i in 1:H){
 temp <- as.vector(t(NGSP))
 temp <- head(temp,length(temp)-n)
 
-matrix <- matrix(rep(0), nrow = H, ncol = 5) 
+matrix <- matrix(rep(0), nrow = H, ncol = length(lambdas))
 S <- c()
 Z <- c()
+for(i in 1:H){
+  a <- breaks[i]+1
+  b <- breaks[i+1]
+  temp_2 <- temp[a:b]
+  Z[i] <- sum(temp_2)/R
+  S[i] <- sqrt((sum(temp_2-Z[i])^(2))/(R-1))
+}
+
 
 for(i in 1:H){
-  S[i] <- 
-  Z[i] <- 
+  for(j in 1:length(lambdas)){
+    matrix[i,j] <- (S[i])/(Z[i]^(1-lambdas[j]))
+  }
 }
+
+CC <- c()
+M_lambda <- c()
+de_lambda <- c()
+for(i in 1:length(lambdas)){
+  M_lambda[i] <- sum(matrix[,i])/H
+  de_lambda[i] <- sqrt(sum(((matrix[,i])-(M_lambda[i]))^2)/(H-1))
+  CC[i] <- de_lambda[i]/M_lambda[i]
+}
+
+CC <- rbind(lambdas,CC)
+CC
+
+# Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
+# valores extremos
+NGSP_SQ <- NGSP^2
+adf.test(NGSP_SQ)
+autoplot(NGSP_SQ)
+
+# Ahora, si quitamos los valores extremos y outliers de la serie original, la mejor
+# transformación es elevar la serie ~ a la -7
+NGSP_SR <- NGSP^(-7)
+adf.test(NGSP_SR)
+autoplot(NGSP_SR)
+
+# Como podemos ver, la prueba de Dickey Fuller nos arroja un valor p de 0.05508, con lo que
+# podríamos rechazar la no estacionariedad de la serie con esta transformación.
+# Hay que recordar que esto es sin usar el comando tsclean
+
+
+# Ahora utilizaremos el siguiente comando para ver cuántas
+# diferencias son necesarias para volver el proceso a uno estacionario.
+ndiffs(NGSP_SQ)
+
+# Aplicamos entonces una primera diferencia a la serie original
+DNGSP <- diff(NGSP_SQ)
+autoplot(DNGSP)
+# Podemos notar que la serie parece ser estacionaria con un punto de equilibrio en 0.
+mean(DNGSP)
 
 
 model <- Arima(NGSP_BC, order=c(1,0,0))
