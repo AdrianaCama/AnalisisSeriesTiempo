@@ -9,7 +9,9 @@ library("nortest")
 
 #package faraway
 library(faraway)
+getwd()
 
+#setwd("C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo")
 ################################################################################################
 ################################################################################################
 ################################################################################################
@@ -110,7 +112,7 @@ n <- 9
 R <- (N-n)/H
 #lambdas <- c(-20,-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5,7,10,20)
 lambdas <- c(-9,-8.5,-8,-7.5,-7,-6.5,-6,5.5)
-lambdas <- seq(from=-8.5,to=-7.5,by =0.05)
+lambdas <- seq(from=-8.5,to=8.5,by =0.1)
 
 breaks <- c()
 breaks[1] <- 0
@@ -151,13 +153,15 @@ for(i in 1:length(lambdas)){
 CC <- rbind(lambdas,CC)
 CC
 
-which.min(CC[2,])
+lambda <- CC[1,which.min(CC[2,])]
+lambda
 
 # Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
 # valores extremos
-NGSP_SQ <- NGSP^2
+NGSP_SQ <- NGSP^lambda
 adf.test(NGSP_SQ)
 autoplot(NGSP_SQ)
+autoplot(NGSP)
 
 # Ahora, si quitamos los valores extremos y outliers de la serie original, la mejor
 # transformación es elevar la serie ~ a la -7 (-8.15)
@@ -189,6 +193,7 @@ autoplot(DNGSP)
 DFAC <- acf(DNGSP)
 DFACP <- pacf(DNGSP)
 
+ggAcf(DNGSP, lag.max=200)
 ggtsdisplay(DNGSP, lag.max=200)
 #Aqui nos quedamos
 
@@ -196,9 +201,10 @@ ggtsdisplay(DNGSP, lag.max=200)
 # De hecho, con tsclean sale un ARIMA(1,1,0)
 # pero intentaremos con un AR(1)
 
-model <- Arima(DNGSP, order=c(0,2,1))
-model <- Arima(DNGSP, order=c(0,1,0))
-model <- Arima(DNGSP, order=c(1,1,0))
+model <- Arima(DNGSP, order=c(0,0,1)) #Nope
+model <- Arima(DNGSP, order=c(0,2,1)) # Prometedor
+model <- Arima(DNGSP, order=c(0,1,0)) # Prometedor
+model <- Arima(DNGSP, order=c(1,1,0)) # Prometedor
 residuals <- residuals(model)
 checkresiduals(model)
 
