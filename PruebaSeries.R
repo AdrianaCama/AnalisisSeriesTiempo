@@ -6,8 +6,6 @@ library(ggplot2)
 library(fma)
 library(expsmooth)
 library("nortest")
-
-#package faraway
 library(faraway)
 getwd()
 
@@ -22,147 +20,153 @@ getwd()
 
 # Dataset and Setup
 # Primero, importamos la serie de tiempo
-datos <- read.csv("Henry_Hub_Natural_Gas_Spot_Price.csv", header = TRUE)
-datos <- datos[rev(rownames(datos)),]
-NGSP <- ts(datos[,2], start=1997, freq=12)
-# Con esto podemos ver la serie de tiempo
-#autoplot(NGSP) 
+setwd("C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo")
 
-# Segundo, quitamos outliers o missing values. CHECAR SI ESTÁ BIEN USAR ESTA FUNCIÓN xd
-NGSP <- tsclean(NGSP)
+
+datos <- read.csv("serie_final.csv", header = TRUE)
+#datos <- datos[rownames(datos),]
+NGSP <- ts(datos[,2])
 
 # Graficamos nuestra serie para obtener una vista previa
 autoplot(NGSP) 
 
-# Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
-# Eso sale sin usar el comando tsclean(NGSP). Usándolo sale ARIMA(1,1,0)
+# Propuesta de modelo con auto.arima sale que es ARIMA(0,2,0)
 autoarima <- auto.arima(NGSP)
+autoarima
 
-################################################################################################
 # FAC, FACP y varianza
 FAC <- acf(NGSP)
 FACP <- pacf(NGSP)
-VarNGSP<-var(NGSP)
-VarNGSP
-# Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1). Por otra
-# parte, la función auto.arima nos propone un modelo ARIMA(0,1,0). Analizaremos ambos.
 
+# Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1)
 
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
 pp.test(NGSP)
 
-# Graficamos por año con el objetivo de observar si hay estacionalidad
-ggseasonplot(NGSP)
+#### Definitivamente no es estacionaria #####
 
-# Variación de la seasonal plot con coordenadas polares. Se puede observar que no es estacional.
-ggseasonplot(NGSP, polar = TRUE)
+# En este tipo de gráficas es conveniente usar una transformación logarítmica, pues parece
+# existir una especie de crecimiento exponencial. Lo haremos en un momento.
 
-# Es posible que el resultado que nos arroja nsdiffs señale que el proceso no es estacional
-nsdiffs(NGSP)
+# Como es un fenómeno reciente, no existen suficientes datos para afirmar estacionalidad
+# ni nada por el estilo.
 
 
 # Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación
-# estabilizadora de varianza. Primero, veremos Box Cox:
-expected <- mean(NGSP)
-expected
-residuals <- residuals(naive(NGSP))
-autoplot(NGSP)
-autoplot(residuals)
+# estabilizadora de varianza. Primero, veremos la transformación logarítmica
+LNGSP <- log(NGSP)
+autoplot(LNGSP)
+adf.test(LNGSP)
+##############################
+# La transformación no es suficiente
 
-## Box Cox
-lambda <- BoxCox.lambda(NGSP)
-NGSP_BC <- BoxCox(NGSP, lambda)
-# Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
-adf.test(NGSP_BC)
-pp.test(NGSP_BC)
-# Creo que está peor jaja :(
+##############################
 
-# Ahora probaremos la transformación logarítmica
-## Logaritmo
-NGSP_LOG <- log(NGSP)
-adf.test(NGSP_LOG)
-autoplot(NGSP_LOG)
-
-# # Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la
-# # serie normal, aplicando BoxCox y logaritmo
-# # Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
-#
-# Probaremos otras transformaciones
-## Square Root
-NGSP_SR <- sqrt(NGSP)
-adf.test(NGSP_SR)
-autoplot(NGSP_SR)
-# Sin tsclean 0.2204, con tsclean 0,3155
-#
-## Cube Root
-NGSP_CR <- (NGSP)^(1/3)
-adf.test(NGSP_CR)
-autoplot(NGSP_CR)
-# Sin tsclean 0.2392, con tsclean 0.3261
-
-## One over
-NGSP_OO <- 1/NGSP
-adf.test(NGSP_OO)
-autoplot(NGSP_OO)
-
-# Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la
-# metodología que está en el Capítulo 4:
-H <- 5
-N <- length(NGSP)
-n <- 9
-R <- (N-n)/H
-#lambdas <- c(-20,-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5,7,10,20)
-lambdas <- c(-9,-8.5,-8,-7.5,-7,-6.5,-6,5.5)
-lambdas <- seq(from=-8.5,to=8.5,by =0.1)
-
-breaks <- c()
-breaks[1] <- 0
-for(i in 1:H){
-  breaks[i+1] <- R*i
-}
-
-temp <- as.vector(t(NGSP))
-temp <- head(temp,length(temp)-n)
-
-matrix <- matrix(rep(0), nrow = H, ncol = length(lambdas))
-S <- c()
-Z <- c()
-for(i in 1:H){
-  a <- breaks[i]+1
-  b <- breaks[i+1]
-  temp_2 <- temp[a:b]
-  Z[i] <- sum(temp_2)/R
-  S[i] <- sqrt((sum(temp_2-Z[i])^(2))/(R-1))
-}
-
-
-for(i in 1:H){
-  for(j in 1:length(lambdas)){
-    matrix[i,j] <- (S[i])/(Z[i]^(1-lambdas[j]))
-  }
-}
-
-CC <- c()
-M_lambda <- c()
-de_lambda <- c()
-for(i in 1:length(lambdas)){
-  M_lambda[i] <- sum(matrix[,i])/H
-  de_lambda[i] <- sqrt(sum(((matrix[,i])-(M_lambda[i]))^2)/(H-1))
-  CC[i] <- de_lambda[i]/M_lambda[i]
-}
-
-CC <- rbind(lambdas,CC)
-CC
-
-lambda <- CC[1,which.min(CC[2,])]
-lambda
-
-# Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
-# valores extremos
-NGSP <- NGSP^lambda
-adf.test(NGSP)
-autoplot(NGSP)
+# La serie original contiene 0, lo cual causa algunos problemas
+# lambda <- BoxCox.lambda(NGSP)
+# NGSP_BC <- BoxCox(NGSP, lambda)
+# adf.test(NGSP_BC)
+# 
+# 
+# expected <- mean(NGSP)
+# expected
+# residuals <- residuals(naive(NGSP))
+# autoplot(NGSP)
+# autoplot(residuals)
+# 
+# ## Box Cox
+# 
+# # Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
+# adf.test(NGSP_BC)
+# pp.test(NGSP_BC)
+# # Creo que está peor jaja :(
+# 
+# # Ahora probaremos la transformación logarítmica
+# ## Logaritmo
+# NGSP_LOG <- log(NGSP)
+# adf.test(NGSP_LOG)
+# autoplot(NGSP_LOG)
+# 
+# # # Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la
+# # # serie normal, aplicando BoxCox y logaritmo
+# # # Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
+# #
+# # Probaremos otras transformaciones
+# ## Square Root
+# NGSP_SR <- sqrt(NGSP)
+# adf.test(NGSP_SR)
+# autoplot(NGSP_SR)
+# # Sin tsclean 0.2204, con tsclean 0,3155
+# #
+# ## Cube Root
+# NGSP_CR <- (NGSP)^(1/3)
+# adf.test(NGSP_CR)
+# autoplot(NGSP_CR)
+# # Sin tsclean 0.2392, con tsclean 0.3261
+# 
+# ## One over
+# NGSP_OO <- 1/NGSP
+# adf.test(NGSP_OO)
+# autoplot(NGSP_OO)
+# 
+# # Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la
+# # metodología que está en el Capítulo 4:
+# H <- 5
+# N <- length(NGSP)
+# n <- 6
+# R <- (N-n)/H
+# #lambdas <- c(-20,-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5,7,10,20)
+# lambdas <- c(-9,-8.5,-8,-7.5,-7,-6.5,-6,5.5)
+# lambdas <- seq(from=-8.5,to=8.5,by =0.1)
+# 
+# breaks <- c()
+# breaks[1] <- 0
+# for(i in 1:H){
+#   breaks[i+1] <- R*i
+# }
+# 
+# temp <- as.vector(t(NGSP))
+# temp <- head(temp,length(temp)-n)
+# 
+# matrix <- matrix(rep(0), nrow = H, ncol = length(lambdas))
+# S <- c()
+# Z <- c()
+# for(i in 1:H){
+#   a <- breaks[i]+1
+#   b <- breaks[i+1]
+#   temp_2 <- temp[a:b]
+#   Z[i] <- sum(temp_2)/R
+#   S[i] <- sqrt((sum(temp_2-Z[i])^(2))/(R-1))
+# }
+# 
+# 
+# for(i in 1:H){
+#   for(j in 1:length(lambdas)){
+#     matrix[i,j] <- (S[i])/(Z[i]^(1-lambdas[j]))
+#   }
+# }
+# 
+# CC <- c()
+# M_lambda <- c()
+# de_lambda <- c()
+# for(i in 1:length(lambdas)){
+#   M_lambda[i] <- sum(matrix[,i])/H
+#   de_lambda[i] <- sqrt(sum(((matrix[,i])-(M_lambda[i]))^2)/(H-1))
+#   CC[i] <- de_lambda[i]/M_lambda[i]
+# }
+# 
+# CC <- rbind(lambdas,CC)
+# CC
+# 
+# lambda <- CC[1,which.min(CC[2,])]
+# lambda
+# 
+# # Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
+# # valores extremos
+# NGSP <- NGSP^lambda
+# adf.test(NGSP)
+# autoplot(NGSP)
 #autoplot(NGSP)
 
 # Ahora, si quitamos los valores extremos y outliers de la serie original, la mejor
@@ -176,8 +180,19 @@ autoplot(NGSP)
 # Hay que recordar que esto es sin usar el comando tsclean
 
 
-backup <- NGSP
-NGSP <- NGSP_BC
+# De
+
+
+# Vamo a probar esta transformación
+# TNGSP <- sign(NGSP)*log1p(abs(NGSP))
+# adf.test(TNGSP)
+# autoplot(TNGSP)
+# 
+# NGSP[1]
+# autoplot(NGSPmayor)
+# 
+# backup <- NGSP
+# NGSP <- NGSP_BC
 
 
 # Ahora utilizaremos el siguiente comando para ver cuántas
@@ -185,17 +200,29 @@ NGSP <- NGSP_BC
 ndiffs(NGSP)
 
 # Aplicamos entonces una primera diferencia a la serie original
-DNGSP <- diff(NGSP)
+# Esto es no aplicando ninguna transformación
+DNGSP <- diff(NGSP, differences = 2)
+autoplot(NGSP)
 autoplot(DNGSP)
 
-#### ESTO ES UNA PRUEBA
-# lambda <- BoxCox.lambda(DNGSP)
-# NGSP_BC <- BoxCox(DNGSP, lambda)
-# adf.test(NGSP_BC)
-# autoplot(NGSP_BC)
-# mean(DNGSP)
+adf.test(DNGSP)
+
+# Esto es aplicando la transformación logarítmica
+DLNGSP <- diff(LNGSP, differences = 2)
+autoplot(NGSP)
+autoplot(DLNGSP)
+
+adf.test(DLNGSP)
+
+###############################
+# La serie se vuelve estacionaria cuando aplicamos dos
+# diferencias de nivel y potencialmente una transformación logarítmica
+###############################
 
 # Ahora veremos cómo se comportan la FAC y la FACP
+
+ggtsdisplay(DNGSP, lag.max=200)
+
 DFAC <- acf(DNGSP)
 DFACP <- pacf(DNGSP)
 
