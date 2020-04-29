@@ -26,6 +26,7 @@ setwd("C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo")
 datos <- read.csv("serie_final.csv", header = TRUE)
 #datos <- datos[rownames(datos),]
 NGSP <- ts(datos[,2])
+backup <- ts(datos[,2])
 
 # Graficamos nuestra serie para obtener una vista previa
 autoplot(NGSP) 
@@ -200,6 +201,14 @@ adf.test(LNGSP)
 ndiffs(NGSP)
 
 # Aplicamos entonces una primera diferencia a la serie original
+
+# Esto es aplicando sólo una diferencia y la transformación logarítmica
+D1NGSP <- diff(LNGSP, differences = 1)
+autoplot(NGSP)
+autoplot(D1NGSP)
+adf.test(D1NGSP)
+
+
 # Esto es no aplicando ninguna transformación
 DNGSP <- diff(NGSP, differences = 2)
 autoplot(NGSP)
@@ -221,47 +230,46 @@ adf.test(DLNGSP)
 
 # Ahora veremos cómo se comportan la FAC y la FACP
 
-ggtsdisplay(DNGSP, lag.max=200)
+#ggtsdisplay(DNGSP, lag.max=200)
 
-DFAC <- acf(DNGSP)
-DFACP <- pacf(DNGSP)
-
-ggAcf(DNGSP, lag.max=200)
+ggtsdisplay(DNGSP, lag.max = 200)
+ggtsdisplay(LNGSP, lag.max = 200) # AR(1)?
+ggtsdisplay(D1NGSP, lag.max=200)
 ggtsdisplay(DNGSP, lag.max=200)
+ggtsdisplay(DLNGSP, lag.max=200) #MA(1)
+
+auto.arima(DLNGSP)
+# DFAC <- acf(DNGSP)
+# DFACP <- pacf(DNGSP)
+
+# ggAcf(DNGSP, lag.max=200)
+# ggtsdisplay(DNGSP, lag.max=200)
 #Aqui nos quedamos
 
 # Se asemejan a lo que habíamos visto antes. Sabemos que puede ser un ARIMA(0,1,0)
 # De hecho, con tsclean sale un ARIMA(1,1,0)
 # pero intentaremos con un AR(1)
-autoplot(NGSP)
-model <- Arima(NGSP, order=c(0,1,0)) # Prometedor
+# autoplot(NGSP)
+# model <- Arima(NGSP, order=c(0,1,0)) # Prometedor
+# 
+# model <- Arima(NGSP, order=c(0,1,1)) #Nope
+# model <- Arima(NGSP, order=c(0,2,1)) # Prometedor
+# model <- Arima(NGSP, order=c(1,1,0)) # Prometedor
+#
 
-model <- Arima(NGSP, order=c(0,1,1)) #Nope
-model <- Arima(NGSP, order=c(0,2,1)) # Prometedor
-model <- Arima(NGSP, order=c(1,1,0)) # Prometedor
 
+#####################################################################################
+#####################################################################################
+# Verificación de supuestos para ARIMA(0,2,1), obtenido con auto.arima
+model <- Arima(LNGSP, order=c(0,2,1))
 residuals <- residuals(model)
-checkresiduals(model)
+# checkresiduals(model)
+# lillie.test(x = residuals)
+# mean(residuals)
+# sqrt(var())
 
-# # Esta función es para ver el número de veces que hay que diferenciar una serie para volverla estacionaria, como 
-# # Como es una caminata aleatoria, sale 1, pues hemos demostrado anteriormente que la primera de la caminata aleatoria
-# # es un proceso estacionario.
-# ndiffs(NGSP)
-
-# # Ahora, aplicamos la primera diferencia para convertirlo a un proceso estacionario
-# NGSP_dif <- diff(NGSP, differences=1)
-
-
-# #Estabilización de varianza con transformación de Box-Cox
-# lambda0<-BoxCox.lambda(NGSP)
-# BoxCoxNGSP<-BoxCox(NGSP,lambda0)
-# autoplot(BoxCoxNGSP)
-
-
-################# Análisis de residuos ##################
-#Residuales
-res_autoarima <- residuals(model)
-checkresiduals(model)
+# autoplot(forecast(model,h=10)
+# )
 
 
 #########################################################################################################
@@ -280,8 +288,14 @@ d <- 1
 q <- 0
 cociente <- (sqrt(N-d-p)) * (media/desv)
 abs(cociente)
+
+# Podemos construir un intervalo de confianza para la media usando Bootstrap
+
 # Como el valor absoluto del conciente es menor que 2, entonces podemos decir que no hay evidencia
 # suficiente para afirmar que la media del proceso es distinta de cero.
+#########################################################################################################
+#PASS
+
 
 
 #########################################################################################################
@@ -292,57 +306,134 @@ checkresiduals(model)
 # De forma visual, parece ser que la varianza no es constante pues
 # se presentan algunos picos que pueden afectar la varianza de los residuales. 
 # Para confirmar, aplicaremos una prueba:
+#########################################################################################################
+# PASS (De momento)
 
 
+
+#########################################################################################################
 # Supuesto 3 (residuos independientes)
+#########################################################################################################
 # Prueba de Ljung-Box
 checkresiduals(model)
 # Los residuos son independientes
+# Con un valor de signficancia del 95%
+Box.test(residuals,type="Ljung")
+# Parece que los residuos son independientes
+#########################################################################################################
+# PASS
 
+#########################################################################################################
 # Supuesto 4 (normalidad)
+#########################################################################################################
 # Verificar que aprox. el 95% de las observaciones se encuentren dentro del intervalo que se extiende 2 
 # desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
-LI2 <- -2*desv
-LS2 <- 2*desv
+desv <- sqrt(var(residuals))
+desv
 
+LEFT <- -2*desv
+RIGHT <- 2*desv
+
+JIJI <- length(residuals[residuals>RIGHT]) + length(residuals[residuals<LEFT])
+JIJI
+4/length(residuals)
+
+# La primera prueba la pasa, sólo el 6.66% de las obsevaciones sobrepasa
+# las dos desviaciones estándar
+breaks <- seq(from = -1, to = 1, by = 0.05)
+hist(residuals, breaks = breaks)
+
+# La distribución de los residuales parece ser simétrica. Hay algunos valores atípicos
+# pero parece normal
+#########################################################################################################
+# PASS
+
+# Estas pruebas no las pasa :(
 qqnorm(residuals)
 qqline(residuals)
 checkresiduals(model)
 shapiro.test(residuals)
 lillie.test(x = residuals)
 
+
+
+
+#########################################################################################################
 # Supuesto 5 (no observaciones aberrantes)
+#########################################################################################################
 # Prácticamente todas las observaciones deberían estar dentro del intervalo que se extiende 3 desviaciones
 # estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
-LI3 <- -3*desv
-LS3 <- 3*desv
+desv <- sqrt(var(residuals))
+desv
+
+LEFT <- -3*desv
+RIGHT <- 3*desv
+
+JIJI <- length(residuals[residuals>RIGHT]) + length(residuals[residuals<LEFT])
+JIJI
+JIJI/length(residuals)
+
+# El 3.33% de las observaciones (2) sobrepasan el intervalo de más menos tres std
+
+checkresiduals(model)
+autoplot(LNGSP)
+autoplot(NGSP)
+
+# Hay que checar esto, pero implícitamnete se asumió que no hay observaciones aberrantes
+# Después de todo, se trata del número acumulado de casos confirmados de COVID en México
 
 
-plot(res_autoarima, ylim=c(-2*10^(-3),6*10^(-4)))
-plot(res_autoarima)
-abline(h=LS2, col="red")
-abline(h=LI2, col="red")
-abline(h=LI3, col="blue")
-abline(h=LS3, col="blue")
+# plot(res_autoarima, ylim=c(-2*10^(-3),6*10^(-4)))
+# plot(res_autoarima)
+# abline(h=LS2, col="red")
+# abline(h=LI2, col="red")
+# abline(h=LI3, col="blue")
+# abline(h=LS3, col="blue")
 
-
+#########################################################################################################
 # Supuesto 6 (parsimonía)
+#########################################################################################################
 # Ver con un 95% de confianza que todos los parámetros sean diferentes de 0.
-# En este caso no hay parámetros ya que el modelo es I(1).
+meanie <- model$coef
+se <- sqrt(model$var.coef)
+
+meanie - (2)*se
+meanie + (2)*se
+
+# El cero no se encuentra dentro del intervalo
+#########################################################################################################
+# PASS
 
 
+#########################################################################################################
 # Supuesto 7 (modelo admisible)
+#########################################################################################################
 # Verificar que los parámetros se encuentren dentro de las regiones admisibles correspondientes.
-# En este caso no hay parámetros ya que el modelo es I(1).
 
+# En este caso, sólo tenemos un parámetro que sería
+meanie
+# El cual definitivamente se encuentra dentro de las regiones admisibles
+# De hecho, el intervalo de confianza nos asegura que está dentro de -.82, -.23 con n 95% de confianza
+
+#########################################################################################################
+# PASS
+
+
+#########################################################################################################
 # Supuesto 8 (modelo estable)
+#########################################################################################################
 # Calculamos las correlaciones entre pares para ver que sean bajas.
-# En este caso no hay correlaciones ya que no hay parámetros, debido a que el modelo es I(1).
-
+# En este caso no hay correlaciones ya que sólo hay un parámetro
+#########################################################################################################
+# PASS
 
 
 
 ####################### Pronósticos #######################
 # auto.arima
-autoarima_pronostico <-forecast(autoarima, h = 3) # Duda con h = 3
-autoplot(autoarima_pronostico)
+fc <-forecast(model, h = 5) # Duda con h = 3
+fc$mean<-exp(fc$mean)
+fc$upper<-exp(fc$upper)
+fc$lower<-exp(fc$lower)
+fc$x<-exp(fc$x)
+autoplot(fc)
