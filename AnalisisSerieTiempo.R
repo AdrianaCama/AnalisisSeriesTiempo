@@ -37,6 +37,7 @@ autoplot(NGSP)
 # Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
 # Eso sale sin usar el comando tsclean(NGSP). Usándolo sale ARIMA(1,1,0)
 autoarima <- auto.arima(NGSP)
+autoarima
 
 ################################################################################################
 # FAC, FACP y varianza
@@ -45,8 +46,9 @@ FACP <- pacf(NGSP)
 VarNGSP<-var(NGSP)
 VarNGSP
 # Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1). Por otra
+# Pero aún no sabemos si es estacionario, entonces posiblemente sea un ARIMA(1,algo,0)
 # parte, la función auto.arima nos propone un modelo ARIMA(0,1,0). Analizaremos ambos.
-
+# 
 
 # Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
 adf.test(NGSP)
