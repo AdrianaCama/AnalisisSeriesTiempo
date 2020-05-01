@@ -1,4 +1,28 @@
-#install.packages("forecast")
+################################################################################################
+################################################################################################
+################################################################################################
+# LAT4017 Series de Tiempo
+# Universidad de las Américas Puebla
+#
+# Proyecto final:
+#   Pronóstico de los precios de gas natural en 
+#   Estados Unidos utilizando series de tiempo
+#
+# Integrantes: 
+#   Adriana Camarillo Durán 15574
+#   Ariel Arturo Ortega Alegría 155804
+#
+# Profesora:
+#   Dra. Daniela Cortés Toto
+#
+# Fecha: 
+#   04 de mayo de 2020
+################################################################################################
+################################################################################################
+################################################################################################
+################################################################################################
+
+### Librerías ##################################################################################
 library(forecast)
 library(tseries)
 library(fpp2)
@@ -6,115 +30,87 @@ library(ggplot2)
 library(fma)
 library(expsmooth)
 library("nortest")
-
-#package faraway
 library(faraway)
-getwd()
 
-#setwd("C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo")
-################################################################################################
-################################################################################################
-################################################################################################
-### Identificación del modelo ##################################################################
-################################################################################################
-################################################################################################
-################################################################################################
+### Ánálisis  ##################################################################################
+## Identificación del modelo ####################################################################
 
-# Dataset and Setup
 # Primero, importamos la serie de tiempo
 datos <- read.csv("Henry_Hub_Natural_Gas_Spot_Price.csv", header = TRUE)
 datos <- datos[rev(rownames(datos)),]
 NGSP <- ts(datos[,2], start=1997, freq=12)
-# Con esto podemos ver la serie de tiempo
-#autoplot(NGSP) 
 
-# Segundo, quitamos outliers o missing values. CHECAR SI ESTÁ BIEN USAR ESTA FUNCIÓN xd
-NGSP <- tsclean(NGSP)
+# Usar estos comandos para verificar el directorio actual y cambiarlo, de ser necesario
+# getwd()
+# setwd("C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo")
 
-# Graficamos nuestra serie para obtener una vista previa
-autoplot(NGSP) 
+# Ahora graficaremos nuestra serie:
+autoplot(NGSP, xlab = "Año", ylab = "Precio") 
 
-# Propuesta de modelo con auto.arima sale que es ARIMA(0,1,0) (I(1)), o sea caminata aleatoria.
-# Eso sale sin usar el comando tsclean(NGSP). Usándolo sale ARIMA(1,1,0)
-autoarima <- auto.arima(NGSP)
-autoarima
-
-################################################################################################
-# FAC, FACP y varianza
-FAC <- acf(NGSP)
-FACP <- pacf(NGSP)
-VarNGSP<-var(NGSP)
-VarNGSP
-# Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1). Por otra
-# Pero aún no sabemos si es estacionario, entonces posiblemente sea un ARIMA(1,algo,0)
-# parte, la función auto.arima nos propone un modelo ARIMA(0,1,0). Analizaremos ambos.
-# 
-
-# Dickey-Fuller Aumentado para probar estacionariedad. El proceso es no estacionario
+# A simple vista, parece que tenemos un proceso no estacionario y sin ninguna tendencia estacional.
+# Para veirificarlo, usamos los siguientes comandos, respectivamente:
 adf.test(NGSP)
 pp.test(NGSP)
 
-# Graficamos por año con el objetivo de observar si hay estacionalidad
-ggseasonplot(NGSP)
+ggseasonplot(NGSP, xlab = "Mes",
+             main = "",
+             title = "asdfasdf", 
+             season.labels = NULL,
+             year.labels = FALSE,
+             year.labels.left = FALSE,
+             col = NULL,
+             continuous = FALSE,
+             polar = FALSE,
+)
 
-# Variación de la seasonal plot con coordenadas polares. Se puede observar que no es estacional.
-ggseasonplot(NGSP, polar = TRUE)
+# Ambas pruebas, la de Dickey-Fuller aumenatada y la prueba de Phillips-Perron nos arrojan 
+# valores p de 0.1607 y 0.1212, respectivamente, lo que nos indica que lidiamos con una serie
+# no estacional.
 
-# Es posible que el resultado que nos arroja nsdiffs señale que el proceso no es estacional
+# Para verificar si es necesario aplicar diferencias para convertir el proceso en uno estacionario
+# y uno no estacional, revisaremos los resultados de los comandos siguientes, respectivamente:
+ndiffs(NGSP)
 nsdiffs(NGSP)
 
+# Despues, observaremos cómo se comportan su función de autocorrelación (FAC) y función
+# de autocorrelación parcial (FACP).
+acf(NGSP)
+pacf(NGSP)
+# Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1).
+# Sin embargo, el proceso debe ser diferenciado (y posiblemente transformado) para ser estacionario,
+# por lo que un posible modelo sea un ARIMA(1,1,0)
 
-# Con el fin de convertir el proceso en uno estacionario, aplicaremos una transformación
-# estabilizadora de varianza. Primero, veremos Box Cox:
-expected <- mean(NGSP)
-expected
-residuals <- residuals(naive(NGSP))
-autoplot(NGSP)
-autoplot(residuals)
+# Ahora, revisaremos lo que la función auto.arima nos devuelve
+auto.arima(NGSP)
+# La propuesta de modelo con la función auto.arima nos arroja un ARIMA(0,1,0), o un (I(1)). Es 
+# decir, parece que tenemos un proceso de caminata aleatoria, la cual sabemos que no es estacionaria
+# sino hasta después de aplicarle una primera diferencia.
 
-## Box Cox
-lambda <- BoxCox.lambda(NGSP)
-NGSP_BC <- BoxCox(NGSP, lambda)
-# Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
-adf.test(NGSP_BC)
-pp.test(NGSP_BC)
-# Creo que está peor jaja :(
+# Después de este pequeño y breve análisis, tenemos dos posibles modelos
+# ARIMA(1,1,0)
+# vs
+# ARIMA(0,1,0)
 
-# Ahora probaremos la transformación logarítmica
-## Logaritmo
-NGSP_LOG <- log(NGSP)
-adf.test(NGSP_LOG)
-autoplot(NGSP_LOG)
+# Tener estos dos modelos similares nos lleva a pensar que el parámetro phi del ARIMA(1,1,0)
+# será muy pequeño, por lo que tendremos especial cuidado en el supuesto de parsimonía para
+# este parámetro.
 
-# # Sin aplicar tsclean para quitar outliers, los valores p quedan 0.1607, 0.324 y .276 para la
-# # serie normal, aplicando BoxCox y logaritmo
-# # Aplicando tsclean quedan 0.2778, 0.3471 y 0.3443
-#
-# Probaremos otras transformaciones
-## Square Root
-NGSP_SR <- sqrt(NGSP)
-adf.test(NGSP_SR)
-autoplot(NGSP_SR)
-# Sin tsclean 0.2204, con tsclean 0,3155
-#
-## Cube Root
-NGSP_CR <- (NGSP)^(1/3)
-adf.test(NGSP_CR)
-autoplot(NGSP_CR)
-# Sin tsclean 0.2392, con tsclean 0.3261
+# Estabilización de varianza ###################################################################
+# Con el propósito de volver estacionaria la serie, buscaremos una transformación al proceso
+# original para ver si ésta puede volverla una serie estacionaria.
 
-## One over
-NGSP_OO <- 1/NGSP
-adf.test(NGSP_OO)
-autoplot(NGSP_OO)
 
-# Parece que ninguna logra hacerla estacionaria, por lo que probaremos con la
-# metodología que está en el Capítulo 4:
+
+
+
+
+# Probaremos con la metodología descrita en el capítulo 4 del libro "Análisis estadístico de 
+# Series de Tiempo Económicas", de Victor Guerrero:
 H <- 5
 N <- length(NGSP)
 n <- 9
 R <- (N-n)/H
-#lambdas <- c(-20,-10,-7,-5,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3,3.5,7,10,20)
+
 lambdas <- c(-9,-8.5,-8,-7.5,-7,-6.5,-6,5.5)
 lambdas <- seq(from=-8.5,to=8.5,by =0.1)
 
@@ -155,32 +151,80 @@ for(i in 1:length(lambdas)){
 }
 
 CC <- rbind(lambdas,CC)
-CC
-
 lambda <- CC[1,which.min(CC[2,])]
+
 lambda
 
-# Parece que la transformación debe ser elevar al cuadrado sin eliminar outliers ni 
-# valores extremos
-NGSP <- NGSP^lambda
-adf.test(NGSP)
-autoplot(NGSP)
-#autoplot(NGSP)
+# De acuerdo a este análisis, parece que la transformación es de la forma f(x) = x^2.
+# Graficaremos esta transformación para obtener una vista previa del proceso:
+NGSPT <- NGSP^lambda
+autoplot(NGSPT, xlab = "Tiempo", ylab = "Precio")
+acf(NGSPT,lag.max = 100, xlab = "Lag", ylab = "FAC")
+# La gráfica parece indicarnos que el proceso sigue siendo no estacionario. 
 
-# Ahora, si quitamos los valores extremos y outliers de la serie original, la mejor
-# transformación es elevar la serie ~ a la -7 (-8.15)
-# NGSP_SR <- NGSP^(-8.15)
-# adf.test(NGSP_SR)
-# autoplot(NGSP_SR)
+# Verificaremos con algunas prueba para confirmar estacionariedad.
+adf.test(NGSPT)
+pp.test(NGSP)
 
-# Como podemos ver, la prueba de Dickey Fuller nos arroja un valor p de 0.05508, con lo que
-# podríamos rechazar la no estacionariedad de la serie con esta transformación.
-# Hay que recordar que esto es sin usar el comando tsclean
+# A pesar que la prueba de Dickey-Fuller aumentada nos arroja un valor-p mucho más pequeño 
+# (con el que podríamos rechazar la no-estacionariedad), la prueba de Phillips-Perron, una versión
+# modificada de la prueba anterior y que proporcionada una conclusión más robusta acerca de la 
+# posible estacionariedad, no cambia su valor-p.
 
+# La anterior transformación parece no ser la más adecuada para estabilizar la varianza, pues
+# agranda los picos presentes en los años 2002, 2006 y 2008.
+
+# Probaremos ahora con la transformación de Box-Cox, una de las transformaciones más conocidas:
+lambda <- BoxCox.lambda(NGSP)
+NGSP_BC <- BoxCox(NGSP, lambda)
+autoplot(NGSP_BC, xlab="Tiempo", ylab="Precio")
+# Parece que Box-Cox es una transformación util, pues se puede notar que la varianza es similar
+# en diferentes instancias del tiempo. 
+adf.test(NGSP_BC)
+pp.test(NGSP_BC)
+
+# Revisaremos su FAC y FACP:
+acf(NGSP)
+pacf(NGSP_BC)
+# Como habíamos comentado anteriormente, se asemejan al de un AR(1,1,0) o un I(1)
+
+# Ahora compararemos la FAC y FACP de la serie transformada con Box Cox y la de un proceso
+# de caminata aleatoria:
+par(mfrow=c(2,2))
+acf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FAC")
+pacf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FACP")
+random_walk <- arima.sim(model = list(order = c(0, 1, 0)), n = 23*12)
+acf(random_walk, main = "Caminata aleatoria", ylab="FAC")
+pacf(random_walk, main = "Caminata aleatoria", ylab="FACP")
+par(mfrow=c(1,1))
+
+# Realizamos un proceso similar con la FAC y FACP de la serie transformada con Box Cox 
+# y la de un proceso ARIMA(1,1,0) con su parámetro menor a 0.1:
+par(mfrow=c(2,2))
+acf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FAC")
+pacf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FACP")
+ar <- arima.sim(list(order=c(1,1,0), ar=.1), n=500)
+acf(ar, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FAC")
+pacf(ar, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FACP")
+par(mfrow=c(1,1))
+
+### PENDIENTE
+# Potencialmente podríamos incluir esto
+par(mfrow=c(2,2))
+acf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FAC")
+pacf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FACP")
+ar1<- arima.sim(list(order=c(1,1,2), ar=0.63371, ma=c(0.40338,0.08182)), n=500)
+acf(ar1, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FAC")
+pacf(ar1, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FACP")
+par(mfrow=c(1,1))
+
+# Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
+adf.test(NGSP_BC)
+pp.test(NGSP_BC)
+# Creo que está peor jaja :(
 
 backup <- NGSP
 NGSP <- NGSP_BC
-
 
 # Ahora utilizaremos el siguiente comando para ver cuántas
 # diferencias son necesarias para volver el proceso a uno estacionario.
@@ -190,33 +234,17 @@ ndiffs(NGSP)
 DNGSP <- diff(NGSP)
 autoplot(DNGSP)
 
-#### ESTO ES UNA PRUEBA
-# lambda <- BoxCox.lambda(DNGSP)
-# NGSP_BC <- BoxCox(DNGSP, lambda)
-# adf.test(NGSP_BC)
-# autoplot(NGSP_BC)
-# mean(DNGSP)
-
-# Ahora veremos cómo se comportan la FAC y la FACP
-DFAC <- acf(DNGSP)
-DFACP <- pacf(DNGSP) # Hacer test de significancia para ver si realmente son 0s
-
-ggAcf(DNGSP, lag.max=200)
-ggtsdisplay(DNGSP, lag.max=200)
-#Aqui nos quedamos
-
-# Se asemejan a lo que habíamos visto antes. Sabemos que puede ser un ARIMA(0,1,0)
-# De hecho, con tsclean sale un ARIMA(1,1,0)
-# pero intentaremos con un AR(1)
-autoplot(NGSP)
+## Estimación de parámetros  ###################################################################
+# Para un I(1)
 model <- Arima(NGSP, order=c(0,1,0)) # Este pasó :D
-model <- Arima(NGSP, order=c(1,1,0)) # Este sólo no pasa parsimonía
-model <- Arima(NGSP, order=c(1,2,0))
-
-
-model <- Arima(NGSP, order=c(0,1,1)) #Nope
-model <- Arima(NGSP, order=c(0,2,1)) # Prometedor
-model <- Arima(NGSP, order=c(1,1,0)) # Prometedor
+# model <- Arima(NGSP, order=c(1,1,0)) # Este sólo no pasa parsimonía
+# model$coef
+# 
+# 
+# model <- Arima(NGSP, order=c(0,1,0), include.drift = TRUE)
+# model <- Arima(NGSP, order=c(0,1,1)) #Nope
+# model <- Arima(NGSP, order=c(0,2,1)) # Prometedor
+# model <- Arima(NGSP, order=c(1,1,0)) # Prometedor
 
 residuals <- residuals(model)
 checkresiduals(model)
@@ -278,7 +306,9 @@ checkresiduals(model)
 # Supuesto 3 (residuos independientes)
 # Prueba de Ljung-Box
 checkresiduals(model)
-Box.test(residuals, lag = 24, type = c("Ljung-Box"))
+Box.test(residuals, type = c("Ljung-Box"))
+
+#NULL HYPOTHESIS: INDEPENDENCE
 # Parecer que a partir de un lag  de 9 se empieza a rechazar independencia
 ## PREGUNTA
 # https://stats.stackexchange.com/questions/6455/how-many-lags-to-use-in-the-ljung-box-test-of-a-time-series
@@ -315,7 +345,6 @@ qqline(residuals)
 checkresiduals(model)
 shapiro.test(residuals)
 lillie.test(x = residuals)
-
 
 
 # Supuesto 5 (no observaciones aberrantes)
@@ -407,6 +436,7 @@ autoarima_pronostico
 
 
 
+model <- Arima(NGSP, order=c(1,1,0)) # Este sólo no pasa parsimonía
 
 
 #########################################################################################################
@@ -555,6 +585,11 @@ autoplot(autoarima_pronostico)
 
 #https://stats.stackexchange.com/questions/333092/why-i-get-the-same-predict-value-in-arima-model
 autoarima_pronostico
+
+
+asdfasdf <- rwf(NGSP, drift=FALSE, h=50, level=80, biasadj=TRUE)
+#INVESTIGAR BIEN ESTO DE BIAS ADJ
+autoplot(NGSP) + autolayer(asdfasdf, series="xd") +  guides(colour=guide_legend(title="Forecast"))
 
 # Los pronósticos parecen estar bien 
 # Te amo <3
