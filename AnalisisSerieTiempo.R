@@ -164,12 +164,19 @@ acf(NGSPT,lag.max = 100, xlab = "Lag", ylab = "FAC")
 
 # Verificaremos con algunas prueba para confirmar estacionariedad.
 adf.test(NGSPT)
-pp.test(NGSP)
+pp.test(NGSPT)
+autoplot(NGSPT)
+auto.arima(NGSP)
 
-# A pesar que la prueba de Dickey-Fuller aumentada nos arroja un valor-p mucho más pequeño 
-# (con el que podríamos rechazar la no-estacionariedad), la prueba de Phillips-Perron, una versión
-# modificada de la prueba anterior y que proporcionada una conclusión más robusta acerca de la 
-# posible estacionariedad, no cambia su valor-p.
+# Revisaremos su FAC y FACP:
+acf(NGSPT)
+pacf(NGSPT)
+
+# A pesar que la prueba de Dickey-Fuller aumentada y la prueba de Phillips-Perron nos arroja 
+# un valor-p mucho más pequeño (con el que podríamos rechazar la no-estacionariedad), esta 
+# función parece incrementar los picos presentados en 2002, 2005 y 2008.
+# De igual manera, su FAC y FACP nos muestran que una primera diferencia sigue siendo
+# necesaria, por lo que tendremos en cuenta esta transformación mas no la usaremos.
 
 # La anterior transformación parece no ser la más adecuada para estabilizar la varianza, pues
 # agranda los picos presentes en los años 2002, 2006 y 2008.
@@ -214,9 +221,11 @@ par(mfrow=c(2,2))
 acf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FAC")
 pacf(NGSP_BC, main = "Precios de gas natural (Box-Cox)", ylab="FACP")
 ar1<- arima.sim(list(order=c(1,1,2), ar=0.63371, ma=c(0.40338,0.08182)), n=500)
-acf(ar1, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FAC")
-pacf(ar1, main = expression(paste("Proceso AR(1) con ",phi,"< 0.1")), ylab="FACP")
+acf(ar1, main = "Proceso ARIMA(1,1,2)", ylab="FAC")
+pacf(ar1, main = "Proceso ARIMA(1,1,2)", ylab="FACP")
 par(mfrow=c(1,1))
+
+autoplot(NGSP)
 
 # Después de aplicar la transformación estabilizadora de varianza, checamos si ya es estacionario
 adf.test(NGSP_BC)
@@ -438,6 +447,208 @@ autoarima_pronostico
 
 model <- Arima(NGSP, order=c(1,1,0)) # Este sólo no pasa parsimonía
 
+
+#########################################################################################################
+# Supuesto 1 (media cero)
+#########################################################################################################
+# Debemos verificar que el valor absoluto del cociente sea menor que dos para decir que no hay evidencia de que 
+# la media del proceso sea diferente de 0. 
+media <- mean(residuals)
+media
+desv <- sqrt(var(residuals))
+desv
+
+N <- length(residuals)
+p <- 0
+d <- 1
+q <- 0
+cociente <- (sqrt(N-d-p)) * (media/desv)
+abs(cociente)
+
+## ARIMA(1,1,0) pasa
+# Como el valor absoluto del conciente es menor que 2, entonces podemos decir que no hay evidencia
+# suficiente para afirmar que la media del proceso es distinta de cero.
+
+
+#########################################################################################################
+# Supuesto 2 (varianza constante)
+#########################################################################################################
+# Observamos de manera visual si la varianza parece ser constante o no
+checkresiduals(model)
+# De forma visual, parece ser que la varianza no es constante pues
+# se presentan algunos picos que pueden afectar la varianza de los residuales. 
+# Para confirmar, aplicaremos una prueba:
+# En el 2006 parece haber un problema (buscar que pasó) y ponerlo en el escrito
+# Idea de mi amorcito preciosa <3
+# Checar de nuevo xd
+
+
+# Supuesto 3 (residuos independientes)
+# Prueba de Ljung-Box
+checkresiduals(model)
+Box.test(residuals, lag = 9, type = c("Ljung-Box"))
+
+# Test de significancia para ver si autocorrelaciones son 
+# significativamente distintas de 0?
+
+# Parecer que a partir de un lag  de 9 se empieza a rechazar independencia
+## PREGUNTA
+# https://stats.stackexchange.com/questions/6455/how-many-lags-to-use-in-the-ljung-box-test-of-a-time-series
+# Potencialmente usar prueba de correlación de atrasos para checar independencia
+# CHECAR 
+# PREGUNTA
+
+
+# Los residuos son independientes
+
+# Supuesto 4 (normalidad)
+# Verificar que aprox. el 95% de las observaciones se encuentren dentro del intervalo que se extiende 2 
+# desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+LI2 <- -2*desv
+LS2 <- 2*desv
+
+desv <- sqrt(var(residuals))
+desv
+
+LEFT <- -2*desv
+RIGHT <- 2*desv
+
+JIJI <- length(residuals[residuals>RIGHT]) + length(residuals[residuals<LEFT])
+JIJI
+JIJI/length(residuals)
+# Se esperaba 5% y es lo que pasó lol
+
+breaks <- seq(from = -10, to = 10, by = 0.5)
+hist(residuals, breaks = breaks)
+# Sí se ve simétrico lol
+
+qqnorm(residuals)
+qqline(residuals)
+checkresiduals(model)
+shapiro.test(residuals)
+lillie.test(x = residuals)
+
+
+
+# Supuesto 5 (no observaciones aberrantes)
+# Prácticamente todas las observaciones deberían estar dentro del intervalo que se extiende 3 desviaciones
+# estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+LI3 <- -3*desv
+LS3 <- 3*desv
+
+desv <- sqrt(var(residuals))
+desv
+
+LEFT <- -3*desv
+RIGHT <- 3*desv
+
+JIJI <- length(residuals[residuals>RIGHT]) + length(residuals[residuals<LEFT])
+JIJI
+JIJI/length(residuals)
+# 3% que era más o menos lo que esperábamos
+
+
+
+plot(res_autoarima, ylim=c(-2*10^(-3),6*10^(-4)))
+plot(res_autoarima)
+abline(h=LS2, col="red")
+abline(h=LI2, col="red")
+abline(h=LI3, col="blue")
+abline(h=LS3, col="blue")
+
+
+
+
+# Supuesto 6 (parsimonía)
+# Ver con un 95% de confianza que todos los parámetros sean diferentes de 0.
+# En este caso no hay parámetros ya que el modelo es I(1).
+meanie <- model$coef
+se <- sqrt(model$var.coef)
+
+meanie - (2)*se
+meanie + (2)*se
+
+# Parece ser que el supuesto de parsimonía no se cumple
+# Parece no ser tan grave, tiene sentido que sea modelado por un ARI(1,1)
+# Justificar bien
+
+
+
+# Supuesto 7 (modelo admisible)
+# Verificar que los parámetros se encuentren dentro de las regiones admisibles correspondientes.
+# En este caso no hay parámetros ya que el modelo es I(1).
+(abs(meanie)<1)
+
+
+# Supuesto 8 (modelo estable)
+# Calculamos las correlaciones entre pares para ver que sean bajas.
+
+# Como sólo hay un parámetro, no hay autocorrelaciones entre parámetros
+
+
+
+####################### Pronósticos #######################
+# auto.arima
+autoarima_pronostico <-forecast(autoarima, h = 5) # Duda con h = 3
+autoplot(autoarima_pronostico)
+
+#https://stats.stackexchange.com/questions/333092/why-i-get-the-same-predict-value-in-arima-model
+autoarima_pronostico
+
+
+asdfasdf <- rwf(NGSP, drift=FALSE, h=50, level=80, biasadj=TRUE)
+#INVESTIGAR BIEN ESTO DE BIAS ADJ
+autoplot(NGSP) + autolayer(asdfasdf, series="xd") +  guides(colour=guide_legend(title="Forecast"))
+
+# Los pronósticos parecen estar bien 
+# Te amo <3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# experiments
+checkresiduals(diff(NGSP))
+checkresiduals(diff(NGSP_BC))
+a
+acf(diff(NGSP_BC), lag.max = 60)
+pacf(diff(NGSP_BC), lag.max = 60)
+
+
+# Si graficamos sus autocorrelaciones y 
+acf(diff(NGSP), lag.max = 200)
+pacf(diff(NGSP), lag.max = 200)
+
+model <- Arima(NGSP_BC, order=c(5,1,9)) # Este sólo no pasa parsimonía
+autoplot(forecast(model))
+
+
+
+
+
+
+
+model <- Arima(NGSP_BC, order=c(1,1,2)) # Este sólo no pasa parsimonía
 
 #########################################################################################################
 # Supuesto 1 (media cero)
