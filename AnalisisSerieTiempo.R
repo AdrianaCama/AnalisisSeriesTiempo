@@ -29,7 +29,7 @@ library(fpp2)
 library(ggplot2)
 library(fma)
 library(expsmooth)
-library("nortest")
+library(nortest)
 library(faraway)
 
 ### Ánálisis  ##################################################################################
@@ -74,8 +74,10 @@ nsdiffs(NGSP)
 
 # Despues, observaremos cómo se comportan su función de autocorrelación (FAC) y función
 # de autocorrelación parcial (FACP).
-acf(NGSP)
-pacf(NGSP)
+par(mfrow=c(2,1))
+acf(NGSP, lag.max = 1000, main="FAC", ylab="FAC")
+pacf(NGSP, lag.max = 1000, main="FACP", ylab="FACP")
+par(mfrow=c(1,1))
 # Al observar la FAC y la FACP podemos notar que el compartamiento se asemeja a un AR(1).
 # Sin embargo, el proceso debe ser diferenciado (y posiblemente transformado) para ser estacionario,
 # por lo que un posible modelo sea un ARIMA(1,1,0)
@@ -189,10 +191,9 @@ autoplot(NGSP_BC, xlab="Tiempo", ylab="Precio")
 # en diferentes instancias del tiempo. 
 adf.test(NGSP_BC)
 pp.test(NGSP_BC)
-
 # Revisaremos su FAC y FACP:
-acf(NGSP_BC)
-pacf(NGSP_BC)
+acf(NGSP_BC, lag.max = 1000, main="FAC", ylab="FAC")
+pacf(NGSP_BC, lag.max = 1000, main="FACP", ylab="FACP")
 # Como habíamos comentado anteriormente, se asemejan al de un AR(1,1,0) o un I(1)
 # Sin embargo, el proceso sigue siendo no estacionario.
 
@@ -208,13 +209,36 @@ ndiffs(NGSP)
 # Aplicamos entonces una primera diferencia a la serie original
 DNGSP <- diff(NGSP)
 autoplot(DNGSP)
+acf(diff(NGSP), lag.max = 1000, main="FAC", ylab="FAC")
+pacf(diff(NGSP), lag.max = 1000, main="FACP", ylab="FACP")
 
 # Parece que la serie es ahora estacionaria. Para confirmar...
 adf.test(DNGSP)
 pp.test(DNGSP)
+# ¿Punto de equilibrio?
+mean(diff(NGSP_BC))
+mean(diff(NGSP_BC)) + sqrt(var(diff(NGSP_BC)))
+mean(diff(NGSP_BC)) - sqrt(var(diff(NGSP_BC)))
 # En efecto, ambas pruebas arrojan valores p menores a 0.01
+# Finalmente, revisamos su FAC y FACP
+acf(diff(NGSP_BC), lag.max = 1000, main="FAC", ylab="FAC")
+pacf(diff(NGSP_BC), lag.max = 1000, main="FACP", ylab="FACP")
+
+# Ahora, la serie ya es estacionaria, pero ¿qué pasa si aplicamos una segunda diferencia?
+acf(diff(diff(NGSP)), lag.max = 1000, main="FAC", ylab="FAC")
+pacf(diff(diff(NGSP)), lag.max = 1000, main="FACP", ylab="FACP")
+acf(diff(diff(NGSP_BC)), lag.max = 1000, main="FAC", ylab="FAC")
+pacf(diff(diff(NGSP_BC)), lag.max = 1000, main="FACP", ylab="FACP")
+# Por las graficas de arriba, percibimos un MA(0,2,1)
+# Hay que tener cuidado con la sobrediferenciación, pues nuestro modelo
+# podría perder poder predictivo
 
 
+################################################################################################
+# Los modelos que proponemos al observar su FAC y FACP son
+### ARIMA(0,1,0) ### Pues se asemeja a la FAC y FACP de una caminata aleatoria
+### ARIMA(1,1,0) ### Pues es p
+### ARIMA(5,1,9) ### Por el modelo propuesto por Hosseinipoor
 
 ################################################################################################
 ## Estimación de parámetros  ###################################################################
@@ -542,6 +566,117 @@ check(a)
 # Supuesto 8: Modelo estable ###################################################################
 # Calculamos las correlaciones entre pares para ver que sean bajas.
 model$var.coef>0.2
+
+
+## Pronósticos #################################################################################
+pronostico <-forecast(model, h = 5, biasadj = TRUE)
+autoplot(pronostico)
+# Estos pronósticos parecen tener sentido, puedes nuesto modelo es un I(1).
+# La demostración se deja al lector.
+
+
+# ARIMA(0,1,1) #################################################################################
+model <- Arima(NGSP, order=c(0,1,1)) 
+
+# Residuales
+residuals <- residuals(model)
+checkresiduals(model)
+
+
+# Supuesto 1: Media cero #######################################################################
+# Debemos verificar que el valor absoluto del cociente sea menor que dos para decir que no hay 
+# evidencia de quela media del proceso sea diferente de 0. 
+N <- length(residuals)
+p <- 5
+d <- 1
+q <- 9
+
+mean <- sum(residuals[-1])/(N-d-p)
+std <- sqrt(sum((residuals[-1] - mean)^2)/(N-d-p-q))
+
+cociente <- (sqrt(N-d-p)) * (mean/std)
+abs(cociente)
+# Como el valor absoluto del conciente es menor que 2, entonces podemos decir que no hay evidencia
+# suficiente para afirmar que la media del proceso es distinta de cero.
+
+
+# Supuesto 2: Varianza constante ###############################################################
+# Observamos de manera visual si la varianza parece ser constante o no
+checkresiduals(model)
+# De forma visual, parece ser que la varianza parece ser constante, pues no se presenta mucha
+# variación en estos a través de los datos históricos.
+
+
+# Supuesto 3: Residuos independientes ##########################################################
+# Aplicamos la prueba de Ljung-Box
+checkresiduals(model)
+acf(residuals)
+Box.test(residuals, type = c("Ljung-Box"), lag = 10)
+Box.test(residuals, type = c("Box-Pierce"), lag = 10)
+# Como podemos ver, ambas pruebas no rechazan el supuesto de independencia con la serie,
+# transformada, caso contrario a la serie normal.
+
+
+# Supuesto 4: Normalidad #######################################################################
+# Verificar que aprox. el 95% de las observaciones se encuentren dentro del intervalo que se extiende 2 
+# desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+std <- sqrt(var(residuals))
+left <- -2*std
+right <- 2*std
+
+temp <- length(residuals[residuals>right]) + length(residuals[residuals<left])
+temp/length(residuals)
+# Alrededor del 6% de los residuales están fuera del intervalo de dos desviaciones estándar, pero
+# parece que este supuesto lo pasa, pues esperábamos un 5%.
+# De igual forma, revisaremos si los residuales se distribuyen de forma simétrica. 
+breaks <- seq(from = floor(max(residuals))-1, to = ceiling(max(residuals)), by = 0.1)
+hist(residuals, breaks = breaks)
+# Es simétrico, sin duda.
+
+# Ahora, aplicaremos las pruebas de Lilliefors ni Shapiro-Wilk
+shapiro.test(residuals)
+lillie.test(residuals)
+# Estas pruebas sí las pasa, lo cual es genial.
+
+# Además, al análizar el gráfico qq, algunas observaciones no caen dentro de la línea recta.
+qqnorm(residuals)
+qqline(residuals)
+
+
+# Supuesto 5: No observaciones aberrantes ######################################################
+# Prácticamente todas las observaciones deberían estar dentro del intervalo que se extiende 3 
+# desviaciones estándar por arriba y por debajo de la media, la cual esperamos que sea 0.
+std <- sqrt(var(residuals))
+left <- -3*std
+right <- 3*std
+
+temp <- length(residuals[residuals>right]) + length(residuals[residuals<left])
+temp/length(residuals)
+# Prácticamente todos los residuos están dentro del rango de tres desviaciones estándar.
+
+
+# Supuesto 6: Parsimonía #######################################################################
+# Ver con un 95% de confianza que todos los parámetros sean diferentes de 0.
+mean <- model$coef
+std <- c()
+for(i in 1:length(mean)){
+  std[i] <- sqrt(model$var.coef[i,i])
+}
+left <- mean - (2)*std
+right <- mean + (2)*std
+left*right
+# De acuerdo a este pequeño análisis, es posible que los parámetros 1, 6 y 7 sean 0, debido a 
+# que sus intervalos de confianza contienen al 0. Sin embargo, si reducimos un poco el nivel
+# de significancia, este supuesto pueda cumplirse.
+
+
+# Supuesto 7: Modelo admisible #################################################################
+# Verificar que los parámetros se encuentren dentro de las regiones admisibles correspondientes.
+# El parámetro se encuentra dentro de la región admisible, pues su valor absoluto es menor a 1
+
+
+# Supuesto 8: Modelo estable ###################################################################
+# En este caso, como sólo hay un parámetro
 
 
 ## Pronósticos #################################################################################
