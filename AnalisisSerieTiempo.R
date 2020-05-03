@@ -251,7 +251,10 @@ pacf(diff(diff(NGSP_BC)), lag.max = 1000, main="FACP", ylab="FACP")
 ################################################################################################
 ## Estimación de parámetros  ###################################################################
 # ARIMA(0,1,0) #################################################################################
-model <- Arima(NGSP_BC, order=c(0,1,0)) 
+# model <- Arima(NGSP_BC, order=c(0,1,0), include.drift = TRUE)
+# Verificando el valor de la deriva, podemos ver que es bastante pequeña, por lo que decidimos
+# excluirla del modelo
+model <- Arima(NGSP_BC, order=c(0,1,0), include.drift = FALSE) 
 
 # Residuales
 residuals <- residuals(model)
@@ -363,6 +366,8 @@ autoplot(pronostico)
 ################################################################################################
 # ARIMA(5,1,9) #################################################################################
 model <- Arima(NGSP_BC, order=c(5,1,9))
+?Arima
+
 
 # Residuales
 residuals <- residuals(model)
@@ -478,6 +483,14 @@ InvertQ(ma)
 # Calculamos las correlaciones entre pares para ver que sean bajas.
 model$var.coef>0.2
 
+model$var.coef[1,1]
+
+temp <- matrix(NA,nrow=14,ncol=14)
+for(i in 1:14){
+  for(j in 1:14){
+    matrix[i,j] <- model$var.coef[i,j]
+  }
+}
 
 ## Pronósticos #################################################################################
 pronostico <-forecast(model, h = 5, biasadj = TRUE)
@@ -586,8 +599,7 @@ left*right
 # De acuerdo a este pequeño análisis, es posible que los parámetros 1, 6 y 7 sean 0, debido a 
 # que sus intervalos de confianza contienen al 0. Sin embargo, si reducimos un poco el nivel
 # de significancia, este supuesto pueda cumplirse.
-
-
+autoplot(diff(NGSP_BC), xlab="Tiempo", ylab="Precio")
 # Supuesto 7: Modelo admisible #################################################################
 # Verificar que los parámetros se encuentren dentro de las regiones admisibles correspondientes.
 # El parámetro se encuentra dentro de la región admisible, pues su valor absoluto es menor a 1
