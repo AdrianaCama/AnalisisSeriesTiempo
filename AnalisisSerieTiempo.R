@@ -185,6 +185,7 @@ pacf(NGSPT)
 
 # Probaremos ahora con la transformación de Box-Cox, una de las transformaciones más conocidas:
 lambda <- BoxCox.lambda(NGSP)
+lambda_bc <- lambda
 NGSP_BC <- BoxCox(NGSP, lambda)
 autoplot(NGSP_BC, xlab="Tiempo", ylab="Precio")
 # Parece que Box-Cox es una transformación util, pues se puede notar que la varianza es similar
@@ -351,8 +352,10 @@ temp/length(residuals)
 
 
 ## Pronósticos #################################################################################
-pronostico <-forecast(model, h = 5, biasadj = TRUE)
-autoplot(pronostico)
+forecast <- rwf(backup, drift=FALSE, lambda=lambda_bc, h=12, level=80,
+           biasadj=TRUE)
+autoplot(backup, xlab="Tiempo", ylab="Precios") +
+  autolayer(forecast)
 # Estos pronósticos parecen tener sentido, puedes nuesto modelo es un I(1).
 # La demostración se deja al lector.
 
@@ -366,9 +369,7 @@ autoplot(pronostico)
 ################################################################################################
 # ARIMA(5,1,9) #################################################################################
 model <- Arima(NGSP_BC, order=c(5,1,9))
-?Arima
-
-
+#?Arima
 # Residuales
 residuals <- residuals(model)
 checkresiduals(model)
@@ -481,20 +482,34 @@ InvertQ(ma)
 
 # Supuesto 8: Modelo estable ###################################################################
 # Calculamos las correlaciones entre pares para ver que sean bajas.
-model$var.coef>0.2
+# Matriz de covarianzas
+model$var.coef
 
 model$var.coef[1,1]
 
-temp <- matrix(NA,nrow=14,ncol=14)
+std <- c()
+for(i in 1:14){
+  std[i] <- sqrt(model$var.coef[i,i])
+}
+
+temp <- model$var.coef
 for(i in 1:14){
   for(j in 1:14){
-    matrix[i,j] <- model$var.coef[i,j]
+    temp[i,j] <- temp[i,j]/(std[i]*std[j]) 
   }
 }
 
+(temp > 0.3)*temp
+write.table((temp > 0.3)*temp, "C:/Users/orteg/OneDrive/Documents/GitHub/AnalisisSeriesTiempo/correlaciones.csv", sep="\t")
+
+
 ## Pronósticos #################################################################################
-pronostico <-forecast(model, h = 5, biasadj = TRUE)
-autoplot(pronostico)
+pronostico <-forecast(model, lambda = lambda_bc, h = 12, biasadj = TRUE)
+autoplot(pronostico, main="", xlab="Tiempo", ylab="Precios") 
+
+autoplot(backup, xlab="Tiempo", ylab="Precios") +
+  autolayer(pronostico)
+
 # Estos pronósticos parecen tener sentido, puedes nuesto modelo es un I(1).
 # La demostración se deja al lector.
 
@@ -610,8 +625,8 @@ autoplot(diff(NGSP_BC), xlab="Tiempo", ylab="Precio")
 
 
 ## Pronósticos #################################################################################
-pronostico <-forecast(model, h = 5, biasadj = TRUE)
-autoplot(pronostico)
+pronostico <-forecast(model, h = 12, biasadj = TRUE)
+autoplot(pronostico, main="", xlab="Tiempo", ylab="Precios")
 # Estos pronósticos parecen tener sentido, puedes nuesto modelo es un I(1).
 # La demostración se deja al lector.
 
@@ -726,7 +741,11 @@ mean + (2)*std
 
 
 ## Pronósticos #################################################################################
-pronostico <-forecast(model, h = 5, biasadj = TRUE)
-autoplot(pronostico)
+pronostico <-forecast(model, lambda = lambda_bc, h = 12, biasadj = TRUE)
+autoplot(pronostico, main="", xlab="Tiempo", ylab="Precios") 
+
+autoplot(backup, xlab="Tiempo", ylab="Precios") +
+  autolayer(pronostico)
+
 # Estos pronósticos parecen tener sentido, puedes nuesto modelo es un I(1).
 # La demostración se deja al lector.
