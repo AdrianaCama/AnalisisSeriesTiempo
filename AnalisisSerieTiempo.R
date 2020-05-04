@@ -51,7 +51,7 @@ autoplot(NGSP, xlab = "Año", ylab = "Precio")
 # Para veirificarlo, usamos los siguientes comandos, respectivamente:
 adf.test(NGSP)
 pp.test(NGSP)
-?ndiffs
+
 ggseasonplot(NGSP, xlab = "Mes",
              main = "",
              title = "asdfasdf", 
